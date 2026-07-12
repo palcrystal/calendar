@@ -1,0 +1,2285 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<!-- maximum-scale=1.0, user-scalable=no と inputフォントサイズ16px以上により、スマホ入力時の自動ズームを徹底防止 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>マイカレンダー</title>
+
+<style>
+body{font-family:sans-serif;margin:0;background:#f5f5f5;}
+
+/* ヘッダーの余白と3点配置 */
+.header{
+  position:relative;
+  display:flex;
+  align-items:center;
+  height: 56px; /* 高さを固定して安定感を向上 */
+  background:white;
+  box-sizing: border-box;
+}
+
+/* 検索ボタン：月曜と火曜の境界線（14.28%の位置）の真上に中心が来るよう精密配置 */
+.left-nav{
+  position:absolute;
+  left: calc(14.28% + 5px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* 年月タイトル：何があっても画面の「完全中央」に固定 */
+.center-nav{
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display:flex;
+  align-items:center;
+  z-index: 5;
+}
+
+/* 今日ボタン：今日にジャンプ */
+.right-nav{
+  position:absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  z-index: 10;
+}
+
+/* 洗練されたカプセル型の今日ボタン＆検索ボタン */
+.today-btn{
+  padding: 8px 16px;
+  font-size:13px;
+  font-weight: bold;
+  border:none;
+  background: #eef2f6;
+  color: #475569;
+  border-radius: 20px;
+  cursor:pointer;
+  transition: all 0.1s ease;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.today-btn:active {
+  background: #e2e8f0;
+  transform: scale(0.96);
+}
+
+#monthTitle{
+  cursor:pointer;
+  margin:0;
+  min-width:120px;
+  text-align:center;
+  color: #555555;
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+/* 予定をコピー中にお知らせし、キャンセルできるスマートな上部バー */
+.copy-indicator-bar {
+  display: none; /* デフォルトは非表示 */
+  align-items: center;
+  justify-content: space-between;
+  background: #eff6ff; /* カレンダーに調和する、淡くお洒落なパステルブルー */
+  border-bottom: 1px solid #dbeafe; /* ソフトな境界線 */
+  padding: 10px 16px;
+  font-size: 12px;
+  color: #1e40af; /* 優しく引き締まるブルー */
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  box-sizing: border-box;
+  animation: slide-down-picker 0.2s ease-out;
+}
+@keyframes slide-down-picker {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* パステル調 of 可愛い解除カプセルボタン */
+.copy-cancel-btn {
+  background: #dbeafe; /* 背景より一歩濃いパステルブルー */
+  color: #1e40af;
+  border: none;
+  border-radius: 14px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.copy-cancel-btn:active {
+  background: #bfdbfe; /* タップ時は心地よいパステルアクアに */
+  transform: scale(0.95);
+}
+
+/* 3つのカレンダーを横に並べるためのスライダーコンテナ */
+.calendar-slider-container {
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+  transition: box-shadow 0.3s ease; /* 枠線が光る animation を滑らかに */
+}
+
+/* コピー待機中、カレンダーを丸ごと1周薄い色で優しく囲むエフェクト */
+.calendar-slider-container.paste-mode-active {
+  box-shadow: inset 0 0 0 3px #bfdbfe; /* インナー枠線でカレンダーを優しく1周囲みます */
+}
+
+.calendar-slider {
+  display: flex;
+  width: 300%;
+  transform: translateX(-33.3333%);
+  will-change: transform;
+}
+
+/* 共通のカレンダーグリッドスタイル */
+.calendar-grid {
+  width: 33.3333%;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px; 
+  padding: 5px;
+  box-sizing: border-box;
+  background: #eeeeee;
+}
+
+.weekday{
+  text-align:center;
+  font-weight:bold;
+  padding: 6px 5px;
+  background:white;
+  color: #555555;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.weekday:nth-child(6){color:#3b82f6;}
+.weekday:nth-child(7){color:#ef4444;}
+
+.day{
+  background: white;
+  height:70px;
+  overflow:hidden;
+  font-size:12px;
+  padding:3px 3px 2px 3px;
+  box-sizing:border-box;
+  transition: background-color 0.15s ease;
+  user-select: none; /* 長押し時のシステムメニュー選択を防止 */
+  -webkit-user-select: none;
+}
+.day:active {
+  background: #f8fafc;
+}
+
+.day.other-month{
+  background:#eeeeee;
+  opacity:0.4;
+}
+
+/* 日付エリアのフレックス配置（日付数字とスタンプを横に並べる） */
+.day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  line-height: 1;
+}
+
+.day-number{
+  font-weight:bold;
+  color: #555555;
+  font-size: 11px;
+}
+
+/* カレンダーマスの祝日用赤文字スタイル */
+.day-number.holiday-red {
+  color: #dc2626 !important;
+}
+
+/* 今日のスタンプ絵文字用のスタイル */
+.day-stamps-container {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+.day-stamp {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.calendar-grid .day:nth-child(7n-1) .day-number{color:#3b82f6;}
+.calendar-grid .day:nth-child(7n) .day-number{color:#ef4444;}
+
+.calendar-grid .day.other-month .day-number{
+  color:#888888 !important;
+}
+
+.events{
+  font-size: 10.5px;
+  margin-top: 3px;
+}
+
+.event{
+  white-space:normal;
+  word-break:break-word;
+  line-height:1.1;
+  border: none;
+  border-radius:2px;
+  padding: 0px 1px;
+  margin-bottom:1px;
+  font-weight:bold;
+  letter-spacing: -0.5px;
+  color: #000000;
+}
+
+/* ===== 予定一覧エリア ===== */
+.editor{
+  display:none;
+  padding: 16px 16px;
+  background:white;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* 日付とスタンプ表示マスを美しくまとめたヘッダー */
+.editor-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom: 12px;
+}
+
+.selected-date-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#selectedDate {
+  font-size: 15px;
+  font-weight: bold;
+  color: #1e293b;
+  letter-spacing: 0.5px;
+}
+
+/* ヘッダーに配置するお洒落なスタンプマス（クリック可能） */
+.header-stamps-trigger {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  min-height: 24px;
+  min-width: 24px;
+  box-sizing: border-box;
+}
+.header-stamps-trigger.active {
+  background: #eff6ff;
+  outline: 1.5px solid #3b82f6;
+}
+/* スタンプ未登録時のプラス記号 */
+.header-stamps-empty {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* アコーディオン展開するスタンプPicker行（デフォルトは非表示） */
+.stamp-picker-row {
+  display: none; /* JavaScriptでtoggleします */
+  align-items: center;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px dashed #e2e8f0;
+  box-sizing: border-box;
+  animation: slide-down-picker 0.2s ease-out;
+}
+
+/* スライドが縦にブレないよう、touch-actionと縦スクロール防止を追加 */
+.stamp-options {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden; /* 縦方向のはみ出しを完全にカット */
+  flex-grow: 1;
+  touch-action: pan-x; /* スマホ操作時に「横スクロールのみ」を受け付け、縦ブレを防止 */
+  scrollbar-width: none; /* Firefox用 */
+}
+.stamp-options::-webkit-scrollbar {
+  display: none; /* Chrome/Safari用 */
+}
+
+/* コロンとしたお洒落なスタンプボタン（ピン留めバッジ対応） */
+.stamp-btn {
+  position: relative;
+  font-size: 19px;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  user-select: none;
+  -webkit-user-select: none;
+  filter: grayscale(0.2);
+  display: inline-block;
+  flex-shrink: 0;
+}
+.stamp-btn:active {
+  transform: scale(1.3);
+}
+.stamp-btn.active {
+  filter: grayscale(0);
+  transform: scale(1.2);
+}
+
+/* 小さなピン留めピンバッジ 📌 */
+.stamp-pin-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 8px;
+  background: white;
+  border-radius: 50%;
+  width: 11px;
+  height: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  pointer-events: none;
+}
+
+/* 仕切り線 */
+.stamp-divider {
+  width: 1px;
+  height: 16px;
+  background: #cbd5e1;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* 絵文字がちょうど「1文字分」美しく収まり、ズームを防ぐ(font-size: 16px)極小スリムインプット */
+.emoji-text-input {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 4px 0;
+  font-size: 16px; /* iOSの入力時自動ズームを防ぐため16px以上に指定 */
+  font-weight: bold;
+  color: #1e293b;
+  margin: 0;
+  outline: none;
+  height: 28px;
+  width: 36px; /* 1文字分にピッタリ収まり端が切れないジャストサイズ */
+  box-sizing: border-box;
+  text-align: center;
+  flex-shrink: 0;
+  letter-spacing: 0px;
+}
+.emoji-text-input:focus {
+  border-color: #cbd5e1;
+  background: white;
+}
+.emoji-text-input::placeholder {
+  font-size: 12px;
+  font-weight: bold;
+  color: #94a3b8;
+  letter-spacing: 0px;
+}
+
+.empty-placeholder {
+  text-align: center;
+  padding: 16px 10px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* タッチ操作の反応速度向上のため touch-action 指定 */
+.event-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  padding: 5.5px 12px; /* 少しパディングを広げてタップしやすく */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none; /* 長押しとスライド移動の判定のズレを防ぐため、カード内ジェスチャーを制御 */
+}
+
+/* ===== 【新設】検索結果専用のカードクラス（予定一覧カードと分離し、指での快適なスクロールを100%実現） ===== */
+.search-result-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  /* touch-action は設定しないため、標準 of 慣性スクロールが自由自在に動きます */
+}
+.search-result-card:active {
+  opacity: 0.7;
+}
+
+.event-card-content {
+  flex-grow: 1;
+  padding-right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  overflow: hidden;
+}
+
+.event-card-title {
+  font-size: 13.5px;
+  font-weight: bold;
+  color: #0f172a;
+  line-height: 1.25;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.event-card-memo {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.3;
+  white-space: normal;
+  word-break: break-all;
+  flex-grow: 1;
+  min-width: 140px;
+  margin-top: 0;
+}
+
+.card-del-btn {
+  background: #ffffff;
+  color: #ef4444;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.card-del-btn:active {
+  background: #ffe4e6;
+  transform: scale(0.9);
+}
+
+.card-edit-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+input,textarea{
+  width:100%;
+  margin: 3px 0;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-sizing:border-box;
+  font-size: 16px;
+  background: #f8fafc;
+}
+input:focus, textarea:focus {
+  outline: none;
+  border-color: #60a5fa;
+  background: white;
+}
+
+.color-picker, .edit-color-picker {
+  display: flex;
+  gap: 14px;
+  margin: 12px 0;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+
+.color-option, .edit-color-option {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.1s ease;
+  border: 2px solid transparent;
+}
+.color-option.selected, .edit-color-option.selected {
+  border-color: #334155 !important;
+}
+.color-option:active, .edit-color-option:active {
+  transform: scale(0.9);
+}
+
+.add-btn {
+  margin-top: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 20px;
+  width: 100%;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.add-btn:active {
+  background: #2563eb;
+  transform: scale(0.98);
+}
+
+.backup{
+  display:flex;
+  gap:10px;
+  margin-top:10px;
+}
+
+.modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(15, 23, 42, 0.15);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  justify-content:center;
+  align-items:center;
+  z-index: 100;
+}
+
+.modal-box{
+  background:white;
+  padding:20px;
+  border-radius: 24px;
+  width:290px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.year-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+}
+
+.year-nav-btn{
+  font-size:20px;
+  padding:4px 10px;
+  border:none;
+  background: #f1f5f9;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.picker-year-text {
+  font-weight: bold;
+  color: #334155;
+}
+
+.month-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+}
+
+.month-btn{
+  padding:10px;
+  border:1px solid #ccc;
+  text-align:center;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.delete-icon-container {
+  width: 48px;
+  height: 48px;
+  background: #fff1f2;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px auto 16px auto;
+}
+.delete-icon-container svg {
+  width: 24px;
+  height: 24px;
+  color: #fda4af;
+}
+
+.delete-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #0f172a;
+  margin: 0 0 20px 0;
+  text-align: center;
+}
+.delete-action-group {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.confirm-del-btn {
+  flex: 1;
+  margin-top: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: bold;
+  background: #fda4af;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.confirm-del-btn:active {
+  background: #f43f5e;
+  transform: scale(0.96);
+}
+.cancel-del-btn {
+  flex: 1;
+  margin-top: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: bold;
+  background: #eef2f6;
+  color: #475569;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+.cancel-del-btn:active {
+  background: #e2e8f0;
+  transform: scale(0.96);
+}
+
+/* 検索窓まわりの美しいスタイル */
+.search-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.search-count-badge {
+  font-size: 11.5px;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: bold;
+  align-self: flex-start;
+  margin: 2px 0 6px 2px;
+  letter-spacing: 0.3px;
+}
+
+/* 1タップ操作用の可愛いカプセル型メニューボタン（削除確認画面と同じ形状に完全統一） */
+.action-menu-btn {
+  flex: 1;                     /* 横幅を均等に3等分する */
+  padding: 10px 12px;          /* 削除確認画面と同じ高さ */
+  font-size: 13.5px;           /* 削除確認画面と同じサイズ */
+  font-weight: bold;           /* 見やすい太字 */
+  border: none;
+  border-radius: 20px;         /* 削除確認画面と全く同一 of 丸み */
+  cursor: pointer;
+  transition: all 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.action-menu-btn:active {
+  transform: scale(0.96);
+}
+</style>
+</head>
+
+<body>
+
+<div class="header" style="overflow: hidden;">
+  <div class="left-nav">
+    <button class="today-btn" onclick="openSearchModal()" style="padding: 8px 12px; background: #eef2f6; border: none; border-radius: 20px; color: #475569;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="width:16px; height:16px;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    </button>
+  </div>
+  <div class="center-nav">
+    <h3 id="monthTitle" onclick="openMonthPicker()"></h3>
+  </div>
+  <div class="right-nav">
+    <button class="today-btn" onclick="goToday()">今日</button>
+  </div>
+</div>
+
+<!-- コピー状態表示バー -->
+<div id="copyIndicator" class="copy-indicator-bar">
+  <span>予定コピー中：日付ダブルタップで貼付け</span>
+  <button class="copy-cancel-btn" onclick="clearCopiedState()">解除</button>
+</div>
+
+<!-- カレンダースライダー -->
+<div id="calendar-container" class="calendar-slider-container">
+  <div id="calendar-slider" class="calendar-slider">
+    <div id="calendar-prev" class="calendar-grid"></div>
+    <div id="calendar" class="calendar-grid"></div>
+    <div id="calendar-next" class="calendar-grid"></div>
+  </div>
+</div>
+
+<!-- 予定一覧エリア -->
+<div class="editor" id="editor">
+  <div class="editor-top">
+    <!-- 日付とスタンプマスを横並びにした新構造 -->
+    <div class="selected-date-wrap">
+      <div id="selectedDate">日付を選択</div>
+      <!-- クリックすると下に入力パレットが展開するスタンプ表示枠 -->
+      <div id="headerStampsTrigger" class="header-stamps-trigger" onclick="toggleStampPicker()">
+        <!-- JavaScriptで動的描画されます -->
+      </div>
+    </div>
+  </div>
+
+  <div class="stamp-picker-row" id="stampPickerRow">
+    <div class="stamp-options" id="stampOptions">
+      <!-- スクリプトで動的生成（お気に入り ＋ 履歴） -->
+    </div>
+    <!-- 仕切り線 -->
+    <div class="stamp-divider"></div>
+    <!-- システム絵文字キーボードを呼び出す入力欄（ピッタリ1文字収まる幅36pxに最適化） -->
+    <input type="text" id="emojiTextInput" class="emoji-text-input" placeholder="+" oninput="handleEmojiInput(this.value)">
+  </div>
+
+  <div id="eventList"></div>
+</div>
+
+<!-- バックアップ＆復元エリア（コンパクト並び・位置順と配色を最適調整） -->
+<div class="backup" style="background: white; padding: 12px 8px; margin-top: 10px; border-top: 1px solid #eeeeee; box-sizing: border-box;">
+  <div style="display: flex; gap: 5px; width: 100%; justify-content: center;">
+    <!-- ICSグループ：他連携（爽やかなパステルブルー、左側に移動） -->
+    <button onclick="exportToICS()" class="action-menu-btn" style="background: #eff6ff; color: #1e40af; padding: 10px 0; font-size: 11px; flex: 1;">
+      ICS出力
+    </button>
+    <button onclick="document.getElementById('icsFileInput').click()" class="action-menu-btn" style="background: #eff6ff; color: #1e40af; padding: 10px 0; font-size: 11px; flex: 1;">
+      ICS入力
+    </button>
+    <!-- JSONグループ：バックアップ（右側に移動、ポップアップ削除ボタンと同等の可愛いパステルピンク） -->
+    <button onclick="exportData()" class="action-menu-btn" style="background: #fff1f2; color: #f43f5e; padding: 10px 0; font-size: 11px; flex: 1;">
+      JSON保存
+    </button>
+    <button onclick="document.getElementById('file').click()" class="action-menu-btn" style="background: #fff1f2; color: #f43f5e; padding: 10px 0; font-size: 11px; flex: 1;">
+      JSON復元
+    </button>
+  </div>
+  <input type="file" id="file" style="display:none" accept=".json">
+  <input type="file" id="icsFileInput" style="display:none" accept=".ics">
+</div>
+
+<div class="modal" id="monthModal">
+  <div class="modal-box">
+    <div class="year-header">
+      <button class="year-nav-btn" onclick="changePickerYear(-1)">◀</button>
+      <span id="pickerYear" class="picker-year-text"></span>
+      <button class="year-nav-btn" onclick="changePickerYear(1)">▶</button>
+    </div>
+    <div class="month-grid" id="monthGrid"></div>
+  </div>
+</div>
+
+<div class="modal" id="addEventModal">
+  <div class="modal-box">
+    <div class="editor-top" style="margin-bottom: 10px;">
+      <div id="popupDate" style="font-weight: bold; color: #334155; font-size: 14px;">新規追加</div>
+      <button class="close-btn" onclick="closeAddEventModal()" style="padding: 6px 12px; font-size: 12px;">閉じる</button>
+    </div>
+
+    <input id="title" placeholder="タイトル" onkeydown="moveToMemo(event)">
+    <textarea id="memo" placeholder="メモ" style="height: 80px; resize: none;"></textarea>
+
+    <div id="colorPicker" class="color-picker"></div>
+
+    <button onclick="addEvent()" class="add-btn">追加</button>
+  </div>
+</div>
+
+<div class="modal" id="deleteConfirmModal">
+  <div class="modal-box" style="width: 270px; padding: 24px;">
+    <div class="delete-icon-container">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 0v3M4 7h16" />
+      </svg>
+    </div>
+    <h3 class="delete-title">予定を削除しますか？</h3>
+    <div class="delete-action-group">
+      <button onclick="closeDeleteConfirmModal()" class="cancel-del-btn">キャンセル</button>
+      <button onclick="executeDelete()" class="confirm-del-btn">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 予定・絵文字それぞれの専用検索窓と、リアルタイム件数表示を搭載した新・検索モーダル -->
+<div class="modal" id="searchModal">
+  <div class="modal-box" style="width: 310px; max-height: 80vh; display: flex; flex-direction: column; padding: 20px;">
+    <div class="editor-top" style="margin-bottom: 12px; flex-shrink: 0;">
+      <div style="font-weight: bold; color: #1e293b; font-size: 15px; display: flex; align-items: center; gap: 6px;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="width:16px; height:16px; color: #475569;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        予定の検索
+      </div>
+      <!-- 閉じるボタンのサイズを一回り大きく調整 -->
+      <button class="close-btn" onclick="closeSearchModal()" style="padding: 8px 16px; font-size: 13px;">閉じる</button>
+    </div>
+    
+    <!-- ダブル検索インプットグループ -->
+    <div class="search-input-group">
+      <!-- 1. キーワード検索窓 -->
+      <input id="searchInput" placeholder="予定のタイトルやメモで検索..." oninput="searchEvents()" style="margin: 0;">
+      <!-- 2. 絵文字ログ検索窓（自動ズームを防ぐため16px設計） -->
+      <input id="searchEmojiInput" placeholder="登録した絵文字で検索..." oninput="searchEvents()" style="margin: 0; font-size: 16px;">
+    </div>
+
+    <!-- リアルタイム件数バッジ -->
+    <div id="searchCountBadge" class="search-count-badge">0件ヒットしました</div>
+    
+    <!-- 検索結果エリア -->
+    <div id="searchResults" style="flex-grow: 1; overflow-y: auto; max-height: 38vh; padding-right: 2px;">
+    </div>
+  </div>
+</div>
+
+<!-- 1タップしたときに現れる操作オプションメニューモーダル -->
+<div class="modal" id="actionMenuModal">
+  <div class="modal-box" style="width: 290px; padding: 22px; border-radius: 24px;">
+    <div style="font-weight: bold; color: #1e293b; font-size: 14.5px; margin-bottom: 18px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" id="actionMenuTitle">予定の操作</div>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="display: flex; gap: 8px; width: 100%;">
+        <!-- コピーボタン -->
+        <button onclick="executeMenuCopy()" class="action-menu-btn" style="background: #eff6ff; color: #1e40af;">
+          コピー
+        </button>
+        <!-- 編集ボタン -->
+        <button onclick="executeMenuEdit()" class="action-menu-btn" style="background: #f1f5f9; color: #475569;">
+          編集
+        </button>
+        <!-- 削除ボタン -->
+        <button onclick="executeMenuDelete()" class="action-menu-btn" style="background: #fff1f2; color: #f43f5e;">
+          削除
+        </button>
+      </div>
+      <!-- キャンセル -->
+      <button onclick="closeActionMenuModal()" class="close-btn" style="margin-top: 8px; padding: 10px; width: 100%; border-radius: 16px; font-size: 13px; font-weight: bold;">
+        キャンセル
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト -->
+<div id="toast" class="toast"></div>
+
+<script>
+let current=new Date();
+let pickerYear=current.getFullYear();
+let selected=null;
+let editMode=false;
+let selectedColor="";
+let editingItem=null;
+let deleteTargetIndex = null;
+
+// コピペ管理ステート
+let copiedEventData = null; 
+
+// 1タップメニュー対象 of インデックスキー
+let activeMenuIndex = null;
+
+// ピン留め（お気に入り）と最近使った絵文字の統合スタンプステート
+let quickStamps = [
+  { char: "☀️", pinned: true },
+  { char: "☁️", pinned: true },
+  { char: "☔️", pinned: true },
+  { char: "😊", pinned: true },
+  { char: "🎉", pinned: true }
+];
+
+const pastelColors=[
+  "rgba(226, 232, 240, 0.75)",
+  "rgba(255, 184, 214, 0.75)",
+  "rgba(255, 229, 143, 0.75)",
+  "rgba(179, 227, 255, 0.75)",
+  "rgba(194, 240, 180, 0.75)",
+  "rgba(222, 196, 255, 0.75)"
+];
+
+const solidColors=[
+  "#cbd5e1",
+  "#ff9ebb",
+  "#ffd766",
+  "#8cd0ff",
+  "#a3e593",
+  "#ceb0ff"
+];
+
+let data={};
+let stamps={}; // スタンプデータ（配列として最大2つまで記録されます）
+
+try {
+  const localData = localStorage.getItem("cal");
+  if (localData) {
+    data = JSON.parse(localData);
+    if (typeof data !== 'object' || data === null) {
+      data = {};
+    }
+  }
+} catch(e) {
+  data = {};
+}
+
+// スタンプの読み込み
+try {
+  const localStamps = localStorage.getItem("cal_stamps");
+  if (localStamps) {
+    stamps = JSON.parse(localStamps);
+    for (const key in stamps) {
+      if (typeof stamps[key] === "string" && stamps[key] !== "") {
+        stamps[key] = [stamps[key]];
+      } else if (!Array.isArray(stamps[key])) {
+        stamps[key] = [];
+      }
+    }
+  }
+} catch(e) {
+  stamps = {};
+}
+
+// クイックスタンプリスト（お気に入り＆履歴）の保存と読み込み
+try {
+  const localQuick = localStorage.getItem("cal_quick_stamps");
+  if (localQuick) {
+    quickStamps = JSON.parse(localQuick);
+  }
+} catch(e) {}
+
+function save(){
+  localStorage.setItem("cal",JSON.stringify(data));
+  localStorage.setItem("cal_stamps",JSON.stringify(stamps));
+  localStorage.setItem("cal_quick_stamps", JSON.stringify(quickStamps));
+}
+
+function format(y,m,d){return y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");}
+
+/* ===== 2015〜2035年用のすべての日本の祝日を高精度で自動判定するアルゴリズム ===== */
+function getHolidayName(y, m, d) {
+  if (y < 2015 || y > 2035) return null; // 2015〜2035年のみに制限
+  
+  const dateStr = `${m}/${d}`;
+  
+  // 1. 固定祝日（法改正時期による変動に対応）
+  const fixed = {
+    "1/1": "元日",
+    "2/11": "建国記念の日",
+    "4/29": "昭和の日",
+    "5/3": "憲法記念日",
+    "5/4": "みどりの日",
+    "5/5": "こどもの日",
+    "11/3": "文化の日",
+    "11/23": "勤労感謝の日"
+  };
+  
+  if (fixed[dateStr]) return fixed[dateStr];
+  
+  // 2. 年の法改正や天皇交代に伴う固定祝日の処理
+  if (y >= 2020 && dateStr === "2/23") return "天皇誕生日";
+  if (y >= 2016 && dateStr === "8/11") {
+    // 2020年と2021年はオリンピック特例で山の日が移動
+    if (y === 2020 && d === 11) return null; 
+    if (y === 2021 && d === 11) return null;
+    return "山の日";
+  }
+  
+  // 3. 春分の日・秋分の日の高精度な天文計算（2015〜2035に対応）
+  const eq = (year) => {
+    const spring = Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    const autumn = Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+    return { spring, autumn };
+  };
+  const { spring, autumn } = eq(y);
+  if (m === 3 && d === spring) return "春分の日";
+  if (m === 9 && d === autumn) return "秋分の日";
+  
+  // 4. ハッピーマンデーの計算（第何月曜日の割り出し）
+  const dayOfWeek = new Date(y, m - 1, d).getDay(); // 曜日（0:日, 1:月...）
+  const week = Math.ceil(d / 7); // 第何週
+  
+  if (dayOfWeek === 1) { // 月曜日
+    if (m === 1 && week === 2) return "成人の日";
+    if (m === 7) {
+      if (y === 2020) { /* 2020特例 */ }
+      else if (y === 2021) { /* 2021特例 */ }
+      else if (week === 3) return "海の日";
+    }
+    if (m === 9 && week === 3) return "敬老の日";
+    if (m === 10) {
+      if (y === 2020) { /* 2020特例 */ }
+      else if (y === 2021) { /* 2021特例 */ }
+      else if (week === 2) return "スポーツの日"; // 2020年から体育の日はスポーツの日に改称
+    }
+  }
+  
+  // 5. オリンピック特例（2020年・2021年）の判定
+  if (y === 2020) {
+    if (m === 7 && d === 23) return "海の日";
+    if (m === 7 && d === 24) return "スポーツの日";
+    if (m === 8 && d === 10) return "山の日";
+  }
+  if (y === 2021) {
+    if (m === 7 && d === 22) return "海の日";
+    if (m === 7 && d === 23) return "スポーツの日";
+    if (m === 8 && d === 8) return "山の日";
+  }
+  
+  // 6. 国民の休日（敬老の日と秋分の日に挟まれた営業日を休みにする特例。2015年、2026年などに発生）
+  if (m === 9 && dayOfWeek === 2 && d === (autumn - 1)) {
+    // 敬老の日の日付をチェック
+    const thirdMonday = 15 + ((8 - new Date(y, 8, 1).getDay()) % 7);
+    if (d === thirdMonday + 1) {
+      return "国民の休日";
+    }
+  }
+
+  // 7. 振替休日の判定
+  return null;
+}
+
+// 振替休日判定（日曜が祝日か、さらに振替が続くかを確認するヘルパー）
+function isSubstitutedHoliday(y, m, d) {
+  const currentDay = new Date(y, m - 1, d);
+  // 日曜日は振替にはならない
+  if (currentDay.getDay() === 0) return false;
+  
+  // 前日が祝日（日曜日）だったかを再帰的に判定する
+  let checkDate = new Date(y, m - 1, d - 1);
+  while (checkDate.getFullYear() === y) {
+    const cy = checkDate.getFullYear();
+    const cm = checkDate.getMonth() + 1;
+    const cd = checkDate.getDate();
+    
+    // その日が本来の祝日かどうか
+    const name = getHolidayName(cy, cm, cd);
+    if (name) {
+      if (checkDate.getDay() === 0) {
+        // 本来の祝日が日曜日であれば、その振替は本日(d)に適用される
+        return true;
+      } else {
+        // その祝日も振替休日である場合は、さらにその前日を確認
+        if (isSubstitutedHoliday(cy, cm, cd)) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          continue;
+        }
+      }
+    }
+    break;
+  }
+  return false;
+}
+
+// 振替も含めた総合祝日判定関数
+function getHolidayFullName(y, m, d) {
+  const name = getHolidayName(y, m, d);
+  if (name) return name;
+  if (isSubstitutedHoliday(y, m, d)) return "振替休日";
+  return null;
+}
+
+/* 日付の横の祝日名はカッコをなくして、赤色（太字）にするHTML生成ロジック */
+function formatJapaneseDate(dateStr) {
+  if(!dateStr) return "日付を選択";
+  const parts = dateStr.split('-');
+  const y = parseInt(parts[0]);
+  const m = parseInt(parts[1]);
+  const d = parseInt(parts[2]);
+  const date = new Date(y, m - 1, d);
+  const daysJp = ["日", "月", "火", "水", "木", "金", "土"];
+  
+  const holiday = getHolidayFullName(y, m, d);
+  const holidayLabel = holiday ? `<span style="color: #dc2626; font-weight: bold; margin-left: 4px;">${holiday}</span>` : '';
+  
+  return `${m}月${d}日 (${daysJp[date.getDay()]})${holidayLabel}`;
+}
+
+function formatFullJapaneseDate(dateStr) {
+  if(!dateStr) return "";
+  const parts = dateStr.split('-');
+  const y = parseInt(parts[0]);
+  const m = parseInt(parts[1]);
+  const d = parseInt(parts[2]);
+  const date = new Date(y, m - 1, d);
+  const daysJp = ["日", "月", "火", "水", "木", "金", "土"];
+  
+  const holiday = getHolidayFullName(y, m, d);
+  const holidayLabel = holiday ? `<span style="color: #dc2626; font-weight: bold; margin-left: 4px;">${holiday}</span>` : '';
+  
+  return `${parts[0]}年${m}月${d}日 (${daysJp[date.getDay()]})${holidayLabel}`;
+}
+
+function openEditor(){document.getElementById("editor").style.display="block";renderHeaderStamps();}
+function closeEditor(){
+  document.getElementById("editor").style.display="none";
+  if (editMode) {
+    toggleEdit();
+  }
+  hideStampPicker();
+}
+
+// 追加ポップアップオープン
+function openAddEventModal(){
+  document.getElementById("popupDate").innerHTML = selected ? formatJapaneseDate(selected) + " の予定追加" : "新規追加";
+  document.getElementById("addEventModal").style.display = "flex";
+  
+  document.getElementById("title").value = "";
+  document.getElementById("memo").value = "";
+  selectedColor = pastelColors[0];
+  
+  renderColorPicker();
+  document.getElementById("title").focus();
+}
+
+function closeAddEventModal(){
+  document.getElementById("addEventModal").style.display = "none";
+  document.getElementById("title").value = "";
+  document.getElementById("memo").value = "";
+  selectedColor = pastelColors[0];
+  renderColorPicker();
+}
+
+function requestDelete(i){
+  deleteTargetIndex = i;
+  document.getElementById("deleteConfirmModal").style.display = "flex";
+}
+
+function closeDeleteConfirmModal(){
+  document.getElementById("deleteConfirmModal").style.display = "none";
+  deleteTargetIndex = null;
+}
+
+function executeDelete(){
+  if (deleteTargetIndex !== null) {
+    del(deleteTargetIndex);
+    closeDeleteConfirmModal();
+  }
+}
+
+function goToday(){
+  const now=new Date();
+  current=new Date(now.getFullYear(),now.getMonth(),1);
+  selected=format(now.getFullYear(),now.getMonth()+1,now.getDate());
+  document.getElementById("selectedDate").innerHTML=formatJapaneseDate(selected);
+  openEditor();
+  render();
+  renderList();
+}
+
+function moveToMemo(e){
+  if(e.key==="Enter"){
+    e.preventDefault();
+    document.getElementById("memo").focus();
+  }
+}
+
+function moveEditToMemo(e,i){
+  if(e.key==="Enter"){
+    e.preventDefault();
+    const memoEl = document.getElementById("editMemo"+i);
+    if (memoEl) memoEl.focus();
+  }
+}
+
+function moveNextEdit(e,i){
+  if(e.key==="Enter"){
+    e.preventDefault();
+    const next=document.getElementById("editTitle"+(i+1));
+    if(next) next.focus();
+  }
+}
+
+function openMonthPicker(){
+  pickerYear=current.getFullYear();
+  renderMonthPicker();
+  document.getElementById("monthModal").style.display="flex";
+}
+
+function changePickerYear(n){
+  pickerYear+=n;
+  renderMonthPicker();
+}
+
+function renderMonthPicker(){
+  document.getElementById("pickerYear").innerText = pickerYear+"年";
+  const grid=document.getElementById("monthGrid");
+  grid.innerHTML="";
+  for(let i=0;i<12;i++){
+    let div=document.createElement("div");
+    div.className="month-btn";
+    div.innerText=(i+1)+"月";
+    div.onclick=()=>{
+      current=new Date(pickerYear,i,1);
+      document.getElementById("monthModal").style.display="none";
+      render();
+    };
+    grid.appendChild(div);
+  }
+}
+
+function openSearchModal() {
+  document.getElementById("searchModal").style.display = "flex";
+  
+  document.getElementById("searchInput").value = "";
+  document.getElementById("searchEmojiInput").value = "";
+  
+  searchEvents();
+}
+
+function closeSearchModal() {
+  document.getElementById("searchModal").style.display = "none";
+}
+
+function searchEvents() {
+  const keywordQuery = document.getElementById("searchInput").value.trim().toLowerCase();
+  const emojiQuery = document.getElementById("searchEmojiInput").value.trim();
+  
+  const resultsContainer = document.getElementById("searchResults");
+  const countBadge = document.getElementById("searchCountBadge");
+  resultsContainer.innerHTML = "";
+  
+  if (!keywordQuery && !emojiQuery) {
+    resultsContainer.innerHTML = `
+      <div class="empty-placeholder" style="padding: 24px 0;">
+        キーワードや絵文字を入力して<br>予定を検索できます。
+      </div>
+    `;
+    countBadge.innerText = "0件ヒットしました";
+    return;
+  }
+  
+  let found = [];
+  const allDateKeys = Array.from(new Set([...Object.keys(data), ...Object.keys(stamps)]));
+  
+  allDateKeys.forEach(dateStr => {
+    const dayEvents = data[dateStr] || [];
+    const dayStamps = stamps[dateStr] || [];
+    
+    let isEmojiMatched = true;
+    if (emojiQuery) {
+      isEmojiMatched = dayStamps.some(s => s.includes(emojiQuery));
+    }
+    
+    if (!isEmojiMatched) return;
+    
+    if (keywordQuery) {
+      let keywordMatchedInDay = false;
+      if (dayEvents.length > 0) {
+        dayEvents.forEach((e, idx) => {
+          const titleMatch = e.title && e.title.toLowerCase().includes(keywordQuery);
+          const memoMatch = e.memo && e.memo.toLowerCase().includes(keywordQuery);
+          
+          if (titleMatch || memoMatch) {
+            found.push({
+              date: dateStr,
+              event: e,
+              index: idx
+            });
+            keywordMatchedInDay = true;
+          }
+        });
+      }
+    } else {
+      if (dayEvents.length > 0) {
+        dayEvents.forEach((e, idx) => {
+          found.push({
+            date: dateStr,
+            event: e,
+            index: idx
+          });
+        });
+      } else if (dayStamps.length > 0) {
+        found.push({
+          date: dateStr,
+          event: {
+            title: "",
+            memo: "予定は登録されていません",
+            color: ""
+          },
+          index: -1
+        });
+      }
+    }
+  });
+  
+  found.sort((a, b) => b.date.localeCompare(a.date));
+  countBadge.innerText = `${found.length}件ヒットしました`;
+  
+  if (found.length === 0) {
+    resultsContainer.innerHTML = `
+      <div class="empty-placeholder" style="padding: 24px 0;">
+        一致する予定や絵文字が見つかりませんでした。
+      </div>
+    `;
+    return;
+  }
+  
+  found.forEach(item => {
+    const e = item.event;
+    const dateStr = item.date;
+    const colorIndex = pastelColors.indexOf(e.color);
+    const accentColor = colorIndex !== -1 ? solidColors[colorIndex] : solidColors[0];
+    const bgColor = e.color || pastelColors[0];
+    
+    const formattedDate = formatFullJapaneseDate(dateStr);
+    
+    let card = document.createElement("div");
+    card.className = "search-result-card";
+    card.style.background = bgColor;
+    card.style.borderLeft = `4px solid ${accentColor}`;
+    
+    card.innerHTML = `
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 2px;">
+        <div style="font-size: 10.5px; color: #475569; font-weight: bold; letter-spacing: 0.2px;">${formattedDate}</div>
+        <div class="event-card-content" style="padding-right: 0;">
+          ${e.title ? `<span class="event-card-title">${e.title}</span>` : ''}
+          ${e.memo ? `<span class="event-card-memo">${e.memo}</span>` : ''}
+        </div>
+      </div>
+    `;
+    
+    card.onclick = () => {
+      jumpToDate(dateStr);
+    };
+    
+    resultsContainer.appendChild(card);
+  });
+}
+
+function jumpToDate(dateStr) {
+  const parts = dateStr.split('-');
+  const y = parseInt(parts[0]);
+  const m = parseInt(parts[1]) - 1;
+  
+  current = new Date(y, m, 1);
+  selected = dateStr;
+  
+  document.getElementById("selectedDate").innerHTML = formatJapaneseDate(selected);
+  closeSearchModal();
+  
+  openEditor();
+  render();
+  renderList();
+  
+  setTimeout(() => {
+    const editorEl = document.getElementById("editor");
+    if (editorEl) {
+      editorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 100);
+}
+
+// スタンプをタップして登録/解除
+function toggleStamp(stamp) {
+  const currentStamps = stamps[selected] || [];
+  const idx = currentStamps.indexOf(stamp);
+  
+  let newStamps = [...currentStamps];
+  if (idx !== -1) {
+    newStamps.splice(idx, 1);
+  } else {
+    if (newStamps.length >= 2) {
+      newStamps.shift();
+    }
+    newStamps.push(stamp);
+    addToHistory(stamp);
+  }
+  
+  updateStampsAndUI(newStamps);
+}
+
+// 履歴に自動登録
+function addToHistory(stamp) {
+  const existingIdx = quickStamps.findIndex(item => item.char === stamp);
+  
+  if (existingIdx !== -1) {
+    const target = quickStamps[existingIdx];
+    if (!target.pinned) {
+      quickStamps.splice(existingIdx, 1);
+      quickStamps.push({ char: stamp, pinned: false });
+    }
+  } else {
+    quickStamps.push({ char: stamp, pinned: false });
+  }
+  
+  const unpinnedList = quickStamps.filter(item => !item.pinned);
+  if (unpinnedList.length > 5) {
+    const firstUnpinnedIdx = quickStamps.findIndex(item => !item.pinned);
+    if (firstUnpinnedIdx !== -1) {
+      quickStamps.splice(firstUnpinnedIdx, 1);
+    }
+  }
+  save();
+}
+
+// 長押しでピン留め
+function togglePinStamp(stampChar) {
+  const target = quickStamps.find(item => item.char === stampChar);
+  if (!target) return;
+  
+  if (!target.pinned) {
+    const textPinnedCount = quickStamps.filter(item => item.pinned).length;
+    if (textPinnedCount >= 5) {
+      showToast("ピン留めは最大5個までです");
+      return;
+    }
+    target.pinned = true;
+    if (navigator.vibrate) navigator.vibrate([30, 20]);
+    showToast(`パレットの左側に固定しました 📌`);
+  } else {
+    target.pinned = false;
+    if (navigator.vibrate) navigator.vibrate(20);
+    showToast("ピン留めを解除しました");
+  }
+  
+  save();
+  renderStampPicker();
+}
+
+// キーボードから絵文字入力
+function handleEmojiInput(val) {
+  const rawEmojis = Array.from(val).filter(char => {
+    return /\p{Emoji}/u.test(char) && !/[a-zA-Z0-9!-~]/.test(char);
+  });
+  
+  if (rawEmojis.length === 0) {
+    updateStampsAndUI([]);
+    return;
+  }
+  
+  const finalEmojis = rawEmojis.slice(-2);
+  
+  finalEmojis.forEach(stamp => {
+    addToHistory(stamp);
+  });
+  
+  updateStampsAndUI(finalEmojis);
+}
+
+// スタンプ状態更新とUI同期
+function updateStampsAndUI(emojiArray) {
+  if (emojiArray.length === 0) {
+    delete stamps[selected];
+  } else {
+    stamps[selected] = emojiArray;
+  }
+  
+  save();
+  render();
+  renderHeaderStamps();
+  renderStampPicker();
+}
+
+/* ヘッダーのスタンプ表示トグルを描画 */
+function renderHeaderStamps() {
+  const trigger = document.getElementById("headerStampsTrigger");
+  if (!trigger) return;
+  trigger.innerHTML = "";
+  
+  const currentStamps = stamps[selected] || [];
+  if (currentStamps.length > 0) {
+    currentStamps.forEach(stamp => {
+      const span = document.createElement("span");
+      span.innerText = stamp;
+      trigger.appendChild(span);
+    });
+  } else {
+    const emptySpan = document.createElement("span");
+    emptySpan.className = "header-stamps-empty";
+    emptySpan.innerText = "＋";
+    trigger.appendChild(emptySpan);
+  }
+}
+
+function toggleStampPicker() {
+  const pickerRow = document.getElementById("stampPickerRow");
+  const trigger = document.getElementById("headerStampsTrigger");
+  if (!pickerRow || !trigger) return;
+  
+  if (pickerRow.style.display === "flex") {
+    hideStampPicker();
+  } else {
+    pickerRow.style.display = "flex";
+    trigger.classList.add("active");
+  }
+}
+
+function hideStampPicker() {
+  const pickerRow = document.getElementById("stampPickerRow");
+  const trigger = document.getElementById("headerStampsTrigger");
+  if (pickerRow) pickerRow.style.display = "none";
+  if (trigger) trigger.classList.remove("active");
+}
+
+function renderStampPicker(){
+  const input = document.getElementById("emojiTextInput");
+  if (input) {
+    const currentStamps = stamps[selected] || [];
+    input.value = currentStamps.length > 0 ? currentStamps[currentStamps.length - 1] : "";
+  }
+  
+  const container = document.getElementById("stampOptions");
+  if (!container) return;
+  container.innerHTML = "";
+  
+  const currentStamps = stamps[selected] || [];
+  const pinnedList = quickStamps.filter(item => item.pinned);
+  const unpinnedList = [...quickStamps.filter(item => !item.pinned)].reverse();
+  const sortedStamps = [...pinnedList, ...unpinnedList];
+  
+  sortedStamps.forEach(item => {
+    const span = document.createElement("span");
+    span.className = "stamp-btn" + (currentStamps.includes(item.char) ? " active" : "");
+    span.innerText = item.char;
+    
+    if (item.pinned) {
+      const badge = document.createElement("div");
+      badge.className = "stamp-pin-badge";
+      badge.innerText = "📌";
+      span.appendChild(badge);
+    }
+    
+    let pressTimer;
+    const startPress = (evt) => {
+      pressTimer = setTimeout(() => {
+        togglePinStamp(item.char);
+      }, 600);
+    };
+    const cancelPress = () => {
+      clearTimeout(pressTimer);
+    };
+    
+    span.addEventListener("touchstart", startPress, {passive: true});
+    span.addEventListener("touchend", cancelPress, {passive: true});
+    span.addEventListener("mousedown", startPress);
+    span.addEventListener("mouseup", cancelPress);
+    span.addEventListener("mouseleave", cancelPress);
+    
+    span.onclick = (e) => {
+      toggleStamp(item.char);
+    };
+    
+    container.appendChild(span);
+  });
+}
+
+function openActionMenuModal(i, eventObj) {
+  activeMenuIndex = i;
+  document.getElementById("actionMenuTitle").innerText = eventObj.title;
+  document.getElementById("actionMenuModal").style.display = "flex";
+}
+
+function closeActionMenuModal() {
+  document.getElementById("actionMenuModal").style.display = "none";
+  activeMenuIndex = null;
+}
+
+function executeMenuCopy() {
+  if (activeMenuIndex === null) return;
+  const targetEvent = data[selected][activeMenuIndex];
+  
+  copiedEventData = {
+    title: targetEvent.title,
+    memo: targetEvent.memo || "",
+    color: targetEvent.color
+  };
+  
+  if (navigator.vibrate) {
+    navigator.vibrate(40);
+  }
+  
+  closeActionMenuModal();
+  render();
+}
+
+function executeMenuEdit() {
+  if (activeMenuIndex === null) return;
+  editingItem = activeMenuIndex;
+  closeActionMenuModal();
+  renderList();
+  
+  setTimeout(() => {
+    const input = document.getElementById("editTitle" + editingItem);
+    if (input) input.focus();
+  }, 100);
+}
+
+function executeMenuDelete() {
+  if (activeMenuIndex === null) return;
+  const idx = activeMenuIndex;
+  closeActionMenuModal();
+  requestDelete(idx);
+}
+
+window.onclick=(e)=>{
+  if(e.target.id==="monthModal"){
+    document.getElementById("monthModal").style.display="none";
+  }
+  if(e.target.id==="addEventModal"){
+    closeAddEventModal();
+  }
+  if(e.target.id==="deleteConfirmModal"){
+    closeDeleteConfirmModal();
+  }
+  if(e.target.id==="searchModal"){
+    closeSearchModal();
+  }
+  if(e.target.id==="actionMenuModal"){
+    closeActionMenuModal();
+  }
+};
+
+function renderColorPicker(){
+  const picker=document.getElementById("colorPicker");
+  picker.innerHTML="";
+  pastelColors.forEach(color=>{
+    let div=document.createElement("div");
+    div.className="color-option";
+    div.style.background=color;
+    if(color===selectedColor)div.classList.add("selected");
+    div.onclick=()=>{
+      selectedColor=color;
+      renderColorPicker();
+    };
+    picker.appendChild(div);
+  });
+}
+
+// スワイプ処理
+let touchStartX = 0;
+let touchStartY = 0;
+let currentX = 0;
+let isDragging = false;
+let isScrollLocked = false;
+let isAnimating = false;
+const sliderEl = document.getElementById("calendar-slider");
+
+if (sliderEl) {
+  sliderEl.addEventListener("touchstart", (e) => {
+    if (isAnimating) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isDragging = true;
+    isScrollLocked = false;
+    sliderEl.style.transition = "none";
+  }, {passive: true});
+
+  sliderEl.addEventListener("touchmove", (e) => {
+    if (!isDragging || isAnimating) return;
+    const touchMoveX = e.touches[0].clientX;
+    const touchMoveY = e.touches[0].clientY;
+    currentX = touchMoveX - touchStartX;
+    const currentY = touchMoveY - touchStartY;
+    if (!isScrollLocked) {
+      if (Math.abs(currentX) > Math.abs(currentY) && Math.abs(currentX) > 10) {
+        isScrollLocked = true;
+      }
+    }
+    if (isScrollLocked) {
+      sliderEl.style.transform = `translateX(calc(-33.3333% + ${currentX}px))`;
+    }
+  }, {passive: true});
+
+  sliderEl.addEventListener("touchend", (e) => {
+    if (!isDragging || isAnimating) return;
+    isDragging = false;
+    const threshold = 80;
+    if (isScrollLocked && Math.abs(currentX) > threshold) {
+      isAnimating = true;
+      sliderEl.style.transition = "transform 0.25s ease-out";
+      const direction = currentX > 0 ? 1 : -1;
+      if (direction > 0) {
+        sliderEl.style.transform = "translateX(0%)";
+      } else {
+        sliderEl.style.transform = "translateX(-66.6666%)";
+      }
+      setTimeout(() => {
+        if (direction > 0) {
+          current.setMonth(current.getMonth() - 1);
+        } else {
+          current.setMonth(current.getMonth() + 1);
+        }
+        render();
+        sliderEl.style.transition = "none";
+        sliderEl.style.transform = "translateX(-33.3333%)";
+        isAnimating = false;
+      }, 250);
+    } else {
+      isAnimating = true;
+      sliderEl.style.transition = "transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+      sliderEl.style.transform = "translateX(-33.3333%)";
+      setTimeout(() => {
+        isAnimating = false;
+      }, 250);
+    }
+    currentX = 0;
+    isScrollLocked = false;
+  });
+}
+
+let lastTap = 0;
+
+function clearCopiedState() {
+  copiedEventData = null;
+  render();
+}
+
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.innerText = message;
+  toast.classList.add("show");
+  setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2000);
+}
+
+function createDayCell(dateObj,isOtherMonth=false){
+  const date=format(dateObj.getFullYear(),dateObj.getMonth()+1,dateObj.getDate());
+  let cell=document.createElement("div");
+  cell.className="day";
+  const today=new Date();
+  const todayStr=format(today.getFullYear(),today.getMonth()+1,today.getDate());
+  if(date===todayStr) cell.style.boxShadow="inset 0 0 0 2px #66fffe";
+  if(isOtherMonth) cell.classList.add("other-month");
+
+  let dayHeader = document.createElement("div");
+  dayHeader.className = "day-header";
+
+  let num=document.createElement("div");
+  num.className="day-number";
+  
+  const holidayName = getHolidayFullName(dateObj.getFullYear(), dateObj.getMonth() + 1, dateObj.getDate());
+  if(holidayName) {
+    num.classList.add("holiday-red");
+  }
+  
+  num.innerText=dateObj.getDate();
+  dayHeader.appendChild(num);
+
+  const dayStamps = stamps[date] || [];
+  if (dayStamps.length > 0) {
+    let stampsContainer = document.createElement("div");
+    stampsContainer.className = "day-stamps-container";
+    
+    dayStamps.forEach(stamp => {
+      let stampSpan = document.createElement("div");
+      stampSpan.className = "day-stamp";
+      stampSpan.innerText = stamp;
+      stampsContainer.appendChild(stampSpan);
+    });
+    
+    dayHeader.appendChild(stampsContainer);
+  }
+
+  let wrap=document.createElement("div");
+  wrap.className="events";
+
+  const dayEvents = Array.isArray(data[date]) ? data[date] : [];
+  dayEvents.forEach(e=>{
+    let div=document.createElement("div");
+    div.className="event";
+    div.style.background=e.color||pastelColors[0];
+    div.innerText=e.title;
+    wrap.appendChild(div);
+  });
+  cell.appendChild(dayHeader);
+  cell.appendChild(wrap);
+
+  cell.onclick=(e)=>{
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap;
+    selected=date;
+    
+    document.getElementById("selectedDate").innerHTML=formatJapaneseDate(date);
+    
+    if (tapLength < 300 && tapLength > 0) {
+      e.preventDefault();
+      if (copiedEventData) {
+        if (navigator.vibrate) navigator.vibrate(40);
+        if (!Array.isArray(data[date])) data[date] = [];
+        data[date].push({
+          title: copiedEventData.title,
+          memo: copiedEventData.memo,
+          color: copiedEventData.color
+        });
+        save();
+        
+        render();
+        openEditor();
+        renderList();
+      } else {
+        openAddEventModal();
+      }
+    } else {
+      hideStampPicker();
+      openEditor();
+      renderList();
+      renderHeaderStamps();
+      renderStampPicker();
+    }
+    lastTap = currentTime;
+  };
+  return cell;
+}
+
+function renderCalendarGrid(container, dateObj) {
+  container.innerHTML = "";
+  const y = dateObj.getFullYear();
+  const m = dateObj.getMonth();
+  ["月","火","水","木","金","土","日"].forEach(w=>{
+    let d=document.createElement("div");
+    d.className="weekday";
+    d.innerText=w;
+    container.appendChild(d);
+  });
+  const firstDay=new Date(y,m,1);
+  const start=(firstDay.getDay()+6)%7;
+  const lastDate=new Date(y,m+1,0).getDate();
+  for(let i=start;i>0;i--){
+    container.appendChild(createDayCell(new Date(y,m,1-i),true));
+  }
+  for(let i=1;i<=lastDate;i++){
+    container.appendChild(createDayCell(new Date(y,m,i),false));
+  }
+  const total=start+lastDate;
+  const remain=42-total;
+  for(let i=1;i<=remain;i++){
+    container.appendChild(createDayCell(new Date(y,m+1,i),true));
+  }
+}
+
+function render(){
+  const cal=document.getElementById("calendar");
+  const calPrev=document.getElementById("calendar-prev");
+  const calNext=document.getElementById("calendar-next");
+  const sliderContainer = document.getElementById("calendar-container");
+  const indicator = document.getElementById("copyIndicator");
+  
+  if (!cal || !calPrev || !calNext) return;
+  const y=current.getFullYear();
+  const m=current.getMonth();
+  document.getElementById("monthTitle").innerText=y+"年 "+(m+1)+"月";
+  
+  if (copiedEventData) {
+    sliderContainer.classList.add("paste-mode-active");
+    indicator.style.display = "flex";
+  } else {
+    sliderContainer.classList.remove("paste-mode-active");
+    indicator.style.display = "none";
+  }
+
+  renderCalendarGrid(cal, current);
+  renderCalendarGrid(calPrev, new Date(y, m - 1, 1));
+  renderCalendarGrid(calNext, new Date(y, m + 1, 1));
+
+  renderHeaderStamps();
+  renderStampPicker();
+}
+
+function addEvent(){
+  const t=document.getElementById("title").value;
+  const m=document.getElementById("memo").value;
+  if(!selected||!t)return;
+  if(!Array.isArray(data[selected])) data[selected]=[];
+  data[selected].push({title:t,memo:m,color:selectedColor});
+  save();
+  render();
+  renderList();
+  closeAddEventModal();
+}
+
+function toggleEdit(){
+  editMode=!editMode;
+  editingItem=null;
+  renderList();
+}
+
+function updateTitle(i,val){
+  if (data[selected] && data[selected][i]) {
+    data[selected][i].title=val;
+    save();
+    render();
+  }
+}
+
+function updateMemo(i,val){
+  if (data[selected] && data[selected][i]) {
+    data[selected][i].memo=val;
+    save();
+    render();
+  }
+}
+
+function updateColor(i,color){
+  if (data[selected] && data[selected][i]) {
+    data[selected][i].color=color;
+    save();
+    render();
+    renderList();
+  }
+}
+
+function del(i){
+  if (data[selected]) {
+    data[selected].splice(i,1);
+    if (data[selected].length === 0) {
+      delete data[selected];
+    }
+    save();
+    render();
+    renderList();
+  }
+}
+
+function renderList(){
+  const list=document.getElementById("eventList");
+  if (!list) return;
+  list.innerHTML="";
+  const dayEvents = Array.isArray(data[selected]) ? data[selected] : [];
+  if (dayEvents.length === 0) {
+    list.innerHTML = `
+      <div class="empty-placeholder">
+        登録された予定はありません。<br>
+        <span style="font-size:11px; opacity:0.7;">（マスをダブルタップして追加できます）</span>
+      </div>
+    `;
+    return;
+  }
+  dayEvents.forEach((e,i)=>{
+    const colorIndex = pastelColors.indexOf(e.color);
+    const accentColor = colorIndex !== -1 ? solidColors[colorIndex] : solidColors[0];
+    const bgColor = e.color || pastelColors[0];
+    let card=document.createElement("div");
+    card.className = "event-card";
+    
+    card.addEventListener("contextmenu", (evt) => evt.preventDefault());
+    
+    if(editingItem===i){
+      card.style.background = "#ffffff";
+      card.style.borderLeft = `4px solid ${accentColor}`;
+      card.style.boxShadow = "0 2px 6px rgba(0,0,0,0.06)";
+      card.style.borderTop = "1px solid #e2e8f0";
+      card.style.borderRight = "1px solid #e2e8f0";
+      card.style.borderBottom = "1px solid #e2e8f0";
+      card.innerHTML=`
+        <div class="card-edit-container">
+          <input id="editTitle${i}" value="${e.title}"
+            onchange="updateTitle(${i},this.value)"
+            onkeydown="moveEditToMemo(event,${i})"
+            style="margin: 0; background: #f8fafc; font-size:16px; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+          <textarea id="editMemo${i}"
+            onchange="updateMemo(${i},this.value)"
+            onkeydown="moveNextEdit(event,${i})"
+            style="margin: 0; background: #f8fafc; font-size:16px; padding: 6px 10px; height: 44px; resize: none; border-radius: 6px; border: 1px solid #e2e8f0;">${e.memo||""}</textarea>
+          <div class="edit-color-picker" style="margin-bottom: 4px;">
+            ${pastelColors.map((color) => `
+              <div class="edit-color-option ${color === e.color ? 'selected' : ''}" 
+                style="background: ${color};" 
+                onclick="updateColor(${i}, '${color}')">
+              </div>
+            `).join('')}
+          </div>
+          <button onclick="toggleEdit()" class="close-btn" style="align-self: flex-end; padding: 6px 16px; font-size: 13px;">完了</button>
+        </div>
+      `;
+    } else {
+      card.style.background = bgColor;
+      card.style.borderLeft = `4px solid ${accentColor}`;
+      card.style.borderTop = "1px solid transparent";
+      card.style.borderRight = "1px solid transparent";
+      card.style.borderBottom = "1px solid transparent";
+      card.style.boxShadow = "none";
+      
+      let contentWrap = document.createElement("div");
+      contentWrap.className = "event-card-content";
+      contentWrap.innerHTML = `
+        <span class="event-card-title">${e.title}</span>
+        ${e.memo ? `<span class="event-card-memo">${e.memo}</span>` : ''}
+      `;
+      
+      card.appendChild(contentWrap);
+      card.onclick = () => {
+        openActionMenuModal(i, e);
+      };
+    }
+    list.appendChild(card);
+  });
+}
+
+function exportData(){
+  const backupObject = {
+    data: data,
+    stamps: stamps,
+    quickStamps: quickStamps
+  };
+  const blob=new Blob([JSON.stringify(backupObject,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="calendar-backup.json";
+  a.click();
+}
+
+/* すべての予定データをカレンダー共通標準語 (.ics) として書き出す処理 */
+function exportToICS() {
+  const dateKeys = Object.keys(data);
+  
+  if (dateKeys.length === 0) {
+    alert("書き出す予定データが登録されていません。");
+    return;
+  }
+  
+  let icsLines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//My Calendar App//NONSGML v1.0//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH"
+  ];
+  
+  dateKeys.forEach(dateStr => {
+    const dayEvents = data[dateStr] || [];
+    if (!Array.isArray(dayEvents)) return;
+    
+    const cleanDate = dateStr.replace(/-/g, ""); 
+    
+    const parts = dateStr.split('-');
+    const currentDay = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const nextDay = new Date(currentDay);
+    nextDay.setDate(currentDay.getDate() + 1);
+    
+    const nextYear = nextDay.getFullYear();
+    const nextMonth = String(nextDay.getMonth() + 1).padStart(2, "0");
+    const nextDate = String(nextDay.getDate()).padStart(2, "0");
+    const cleanNextDate = `${nextYear}${nextMonth}${nextDate}`; 
+    
+    dayEvents.forEach((evt, index) => {
+      const summary = (evt.title || "予定").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;");
+      const description = (evt.memo || "").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\n/g, "\\n");
+      
+      const stamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      const uniqueId = `event-${cleanDate}-${index}-${stamp}@mycalendar.local`;
+      
+      icsLines.push("BEGIN:VEVENT");
+      icsLines.push(`UID:${uniqueId}`);
+      icsLines.push(`DTSTAMP:${stamp}`);
+      icsLines.push(`DTSTART;VALUE=DATE:${cleanDate}`);
+      icsLines.push(`DTEND;VALUE=DATE:${cleanNextDate}`);
+      icsLines.push(`SUMMARY:${summary}`);
+      if (description) {
+        icsLines.push(`DESCRIPTION:${description}`);
+      }
+      icsLines.push("END:VEVENT");
+    });
+  });
+  
+  icsLines.push("END:VCALENDAR");
+  
+  const icsContent = icsLines.join("\r\n");
+  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), icsContent], { type: "text/calendar;charset=utf-8" });
+  
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "my-calendar-events.ics";
+  a.click();
+}
+
+/* ===== 【修正】予定内サブグループ(VALARM等)のDESCRIPTIONをスキップする安全なインポート処理 ===== */
+function importFromICS(text) {
+  const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
+  const lines = unfoldedText.split(/\r?\n/);
+  
+  let eventsAdded = 0;
+  let inEvent = false;
+  let inSubBlock = false; // VEVENT内のサブブロック（VALARM等）を検出するフラグ
+  let currentEvent = {};
+  
+  for (let line of lines) {
+    line = line.trim();
+    if (line === "BEGIN:VEVENT") {
+      inEvent = true;
+      inSubBlock = false;
+      currentEvent = {};
+    } else if (line === "END:VEVENT") {
+      if (inEvent && currentEvent.date && currentEvent.title) {
+        if (!Array.isArray(data[currentEvent.date])) {
+          data[currentEvent.date] = [];
+        }
+        
+        const isDuplicate = data[currentEvent.date].some(e => e.title === currentEvent.title && e.memo === (currentEvent.memo || ""));
+        if (!isDuplicate) {
+          data[currentEvent.date].push({
+            title: currentEvent.title,
+            memo: currentEvent.memo || "",
+            color: pastelColors[0] 
+          });
+          eventsAdded++;
+        }
+      }
+      inEvent = false;
+      inSubBlock = false;
+    } else if (inEvent) {
+      // VEVENT内にいる状態で、VEVENT以外のサブブロック(VALARM等)が始まったらフラグをオン
+      if (line.startsWith("BEGIN:") && line !== "BEGIN:VEVENT") {
+        inSubBlock = true;
+        continue;
+      }
+      // サブブロックが終了したらフラグをオフ
+      if (line.startsWith("END:") && line !== "END:VEVENT") {
+        inSubBlock = false;
+        continue;
+      }
+      
+      // サブブロック（通知アラーム）のエリアにいる間の DESCRIPTION は本体のメモではないため無視する
+      if (inSubBlock) {
+        continue;
+      }
+
+      const colonIndex = line.indexOf(":");
+      if (colonIndex !== -1) {
+        const keyPart = line.substring(0, colonIndex);
+        let value = line.substring(colonIndex + 1);
+        
+        const name = keyPart.split(";")[0].trim();
+        
+        const unescapeText = (str) => {
+          return str.replace(/\\(.)/g, "$1").replace(/\\n/gi, "\n");
+        };
+        
+        if (name === "DTSTART") {
+          const datePart = value.replace(/[^0-9]/g, "").substring(0, 8); 
+          if (datePart && datePart.length === 8) {
+            const y = datePart.substring(0, 4);
+            const m = datePart.substring(4, 6);
+            const d = datePart.substring(6, 8);
+            currentEvent.date = `${y}-${m}-${d}`;
+          }
+        } else if (name === "SUMMARY") {
+          currentEvent.title = unescapeText(value);
+        } else if (name === "DESCRIPTION") {
+          currentEvent.memo = unescapeText(value);
+        }
+      }
+    }
+  }
+  
+  if (eventsAdded > 0) {
+    save();
+    render();
+    renderList();
+    alert(`${eventsAdded} 件の予定を新しく追加しました！`);
+  } else {
+    alert("読み込める新しい予定が見つかりませんでした。\n（すでにカレンダーに登録されているか、有効なファイルではありません）");
+  }
+}
+
+// ファイル読み込み処理の初期化
+const fileInput = document.getElementById("file");
+if (fileInput) {
+  fileInput.addEventListener("change",function(e){
+    const file=e.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=(event)=>{
+      try{
+        const parsed = JSON.parse(event.target.result);
+        if (typeof parsed === 'object' && parsed !== null) {
+          
+          if (parsed.data && typeof parsed.data === 'object') {
+            data = parsed.data;
+            stamps = parsed.stamps || {};
+            if (parsed.quickStamps && Array.isArray(parsed.quickStamps)) {
+              quickStamps = parsed.quickStamps;
+            }
+          } else {
+            data = parsed;
+          }
+          
+          save();
+          render();
+          renderList();
+          alert("復元しました");
+        } else {
+          alert("JSONファイルが正しくありません");
+        }
+      }catch{
+        alert("JSONファイルが正しくありません");
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+// ICSファイル読み込み処理の初期化
+const icsFileInput = document.getElementById("icsFileInput");
+if (icsFileInput) {
+  icsFileInput.addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        importFromICS(event.target.result);
+      } catch(err) {
+        alert("ICSファイルの読み込み中にエラーが発生しました。");
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+selectedColor = pastelColors[0];
+render();
+renderColorPicker();
+</script>
+
+</body>
+</html>
