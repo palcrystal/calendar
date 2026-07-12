@@ -5,6 +5,8 @@
 <!-- maximum-scale=1.0, user-scalable=no と inputフォントサイズ16px以上により、スマホ入力時の自動ズームを徹底防止 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>マイカレンダー</title>
+
+<!-- iPhoneのホーム画面追加時用の丸角アプリアイコン指定 -->
 <link rel="apple-touch-icon" href="icon.png">
 
 <style>
@@ -153,14 +155,17 @@ body{font-family:sans-serif;margin:0;background:#f5f5f5;}
   background: #eeeeee;
 }
 
+/* 曜日マスの全体の高さを22pxに直接固定し、1行で美しく中央揃えにする設定 */
 .weekday{
   text-align:center;
   font-weight:bold;
-  padding: 6px 5px;
+  height: 22px;
+  line-height: 22px;
   background:white;
   color: #555555;
   font-size: 11px;
   letter-spacing: 0.5px;
+  box-sizing: border-box;
 }
 
 .weekday:nth-child(6){color:#3b82f6;}
@@ -425,7 +430,7 @@ body{font-family:sans-serif;margin:0;background:#f5f5f5;}
   touch-action: none; /* 長押しとスライド移動の判定のズレを防ぐため、カード内ジェスチャーを制御 */
 }
 
-/* ===== 【新設】検索結果専用のカードクラス（予定一覧カードと分離し、指での快適なスクロールを100%実現） ===== */
+/* ===== 検索結果専用のカードクラス（予定一覧カードと分離し、指での快適なスクロールを100%実現） ===== */
 .search-result-card {
   display: flex;
   align-items: center;
@@ -1077,7 +1082,6 @@ function getHolidayName(y, m, d) {
   
   // 6. 国民の休日（敬老の日と秋分の日に挟まれた営業日を休みにする特例。2015年、2026年などに発生）
   if (m === 9 && dayOfWeek === 2 && d === (autumn - 1)) {
-    // 敬老の日の日付をチェック
     const thirdMonday = 15 + ((8 - new Date(y, 8, 1).getDay()) % 7);
     if (d === thirdMonday + 1) {
       return "国民の休日";
@@ -1091,24 +1095,19 @@ function getHolidayName(y, m, d) {
 // 振替休日判定（日曜が祝日か、さらに振替が続くかを確認するヘルパー）
 function isSubstitutedHoliday(y, m, d) {
   const currentDay = new Date(y, m - 1, d);
-  // 日曜日は振替にはならない
   if (currentDay.getDay() === 0) return false;
   
-  // 前日が祝日（日曜日）だったかを再帰的に判定する
   let checkDate = new Date(y, m - 1, d - 1);
   while (checkDate.getFullYear() === y) {
     const cy = checkDate.getFullYear();
     const cm = checkDate.getMonth() + 1;
     const cd = checkDate.getDate();
     
-    // その日が本来の祝日かどうか
     const name = getHolidayName(cy, cm, cd);
     if (name) {
       if (checkDate.getDay() === 0) {
-        // 本来の祝日が日曜日であれば、その振替は本日(d)に適用される
         return true;
       } else {
-        // その祝日も振替休日である場合は、さらにその前日を確認
         if (isSubstitutedHoliday(cy, cm, cd)) {
           checkDate.setDate(checkDate.getDate() - 1);
           continue;
@@ -2133,14 +2132,14 @@ function exportToICS() {
   a.click();
 }
 
-/* ===== 【修正】予定内サブグループ(VALARM等)のDESCRIPTIONをスキップする安全なインポート処理 ===== */
+/* 予定内サブグループ(VALARM等)のDESCRIPTIONをスキップする安全なインポート処理 */
 function importFromICS(text) {
   const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
   const lines = unfoldedText.split(/\r?\n/);
   
   let eventsAdded = 0;
   let inEvent = false;
-  let inSubBlock = false; // VEVENT内のサブブロック（VALARM等）を検出するフラグ
+  let inSubBlock = false; 
   let currentEvent = {};
   
   for (let line of lines) {
@@ -2168,18 +2167,14 @@ function importFromICS(text) {
       inEvent = false;
       inSubBlock = false;
     } else if (inEvent) {
-      // VEVENT内にいる状態で、VEVENT以外のサブブロック(VALARM等)が始まったらフラグをオン
       if (line.startsWith("BEGIN:") && line !== "BEGIN:VEVENT") {
         inSubBlock = true;
         continue;
       }
-      // サブブロックが終了したらフラグをオフ
       if (line.startsWith("END:") && line !== "END:VEVENT") {
         inSubBlock = false;
         continue;
       }
-      
-      // サブブロック（通知アラーム）のエリアにいる間の DESCRIPTION は本体のメモではないため無視する
       if (inSubBlock) {
         continue;
       }
@@ -2284,3 +2279,4 @@ renderColorPicker();
 
 </body>
 </html>
+
