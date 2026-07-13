@@ -8,6 +8,13 @@
 
 <!-- iPhoneのホーム画面追加時用の丸角アプリアイコン指定 -->
 <link rel="apple-touch-icon" href="icon.png">
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('サービスワーカーが登録されました'))
+      .catch(err => console.error('登録失敗:', err));
+  }
+</script>
 
 <style>
 body{font-family:sans-serif;margin:0;background:#f5f5f5;}
