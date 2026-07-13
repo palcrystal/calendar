@@ -9,11 +9,33 @@
 <!-- iPhoneのホーム画面追加時用の丸角アプリアイコン指定 -->
 <link rel="apple-touch-icon" href="icon.png">
 <script>
+  // 1. サービスワーカーの登録（さっきやったやつ）
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('サービスワーカーが登録されました'))
+      .then(() => console.log('サービスワーカー登録完了'))
       .catch(err => console.error('登録失敗:', err));
   }
+
+  // 2. アプリ起動時に「通知の許可」をユーザーにお願いする
+  window.addEventListener('load', () => {
+    // すでに許可されていなければ、許可を求める画面を出す
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          console.log('通知が許可されました！');
+          // 許可してくれたお礼に、お試しで3秒後にテスト通知を飛ばしてみる
+          navigator.serviceWorker.ready.then((registration) => {
+            setTimeout(() => {
+              registration.showNotification('通知テスト', {
+                body: 'カレンダーアプリからの通知テストです！成功しました。',
+                icon: './icon.png'
+              });
+            }, 3000);
+          });
+        }
+      });
+    }
+  });
 </script>
 
 <style>
