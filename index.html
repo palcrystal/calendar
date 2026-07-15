@@ -2132,8 +2132,9 @@ function exportToICS() {
   icsLines.push("END:VCALENDAR");
   
   const icsContent = icsLines.join("\r\n");
-  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), icsContent], { type: "text/calendar;charset=utf-8" });
-  
+  const blob = new Blob([icsContent], {
+  type: "text/calendar;charset=utf-8"
+});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "my-calendar-events.ics";
