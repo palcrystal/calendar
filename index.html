@@ -2040,17 +2040,41 @@ function renderList(){
   });
 }
 
-function exportData(){
+async function exportData() {
   const backupObject = {
     data: data,
     stamps: stamps,
     quickStamps: quickStamps
   };
-  const blob=new Blob([JSON.stringify(backupObject,null,2)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="calendar-backup.json";
+
+  const json = JSON.stringify(backupObject, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+
+  // iPhoneなど共有API対応なら共有シートを表示
+  if (navigator.canShare) {
+    try {
+      const file = new File([blob], "calendar-backup.json", {
+        type: "application/json"
+      });
+
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: "カレンダーバックアップ",
+          files: [file]
+        });
+        return;
+      }
+    } catch (e) {
+      // キャンセルや非対応時は通常ダウンロードへ
+    }
+  }
+
+  // 従来どおりダウンロード
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "calendar-backup.json";
   a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 /* すべての予定データをカレンダー共通標準語 (.ics) として書き出す処理 */
