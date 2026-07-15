@@ -2090,8 +2090,9 @@ function exportToICS() {
       const summary = (evt.title || "予定").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;");
       const description = (evt.memo || "").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\n/g, "\\n");
       
-      const stamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-      const uniqueId = `event-${cleanDate}-${index}-${stamp}@mycalendar.local`;
+      // 出力時刻をベースにせず、予定ごとの静的な文字列で一意のハッシュUIDを作成（重複登録・複製を防ぐ）
+      const uniqueId = `event-${cleanDate}-${index}@mycalendar.local`;
+      const stamp = "20260101T000000Z"; // 静的または予定固定のタイムスタンプを指定
       
       icsLines.push("BEGIN:VEVENT");
       icsLines.push(`UID:${uniqueId}`);
