@@ -2090,12 +2090,8 @@ function exportToICS() {
       const summary = (evt.title || "予定").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;");
       const description = (evt.memo || "").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\n/g, "\\n");
       
-      // UIDは予定と日付を特定するもので固定（重複登録を防ぐ）
-      const uniqueId = `event-${cleanDate}-${index}@mycalendar.local`;
-      
-      // DTSTAMP（データ生成時刻）を「出力した最新の時刻」にすることで、
-      // 予定が編集された場合にiPhone側が「以前のデータより新しい！」と正しく上書き更新してくれるようになります
       const stamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      const uniqueId = `event-${cleanDate}-${index}-${stamp}@mycalendar.local`;
       
       icsLines.push("BEGIN:VEVENT");
       icsLines.push(`UID:${uniqueId}`);
