@@ -2059,7 +2059,6 @@ async function exportData() {
 
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: "カレンダーバックアップ",
           files: [file]
         });
         return;
