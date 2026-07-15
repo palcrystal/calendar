@@ -8,50 +8,6 @@
 
 <!-- iPhoneのホーム画面追加時用の丸角アプリアイコン指定 -->
 <link rel="apple-touch-icon" href="icon.png">
-<!-- 画面のどこかに、一時的に通知許可をもらうためのボタンを置きます -->
-<button id="notify-btn" style="margin: 20px; padding: 10px; font-size: 16px;">🔔 通知を有効にする</button>
-
-<script>
-  // 1. サービスワーカーの登録
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('サービスワーカー登録完了'))
-      .catch(err => console.error('登録失敗:', err));
-  }
-
-  // 2. ボタンをタップしたときに、初めて通知の許可を求める
-  document.getElementById('notify-btn').addEventListener('click', () => {
-    // 状態をチェック
-    if (Notification.permission === 'granted') {
-      alert('すでに通知は許可されています！');
-      return;
-    }
-    
-    if (Notification.permission === 'denied') {
-      alert('通知がブロックされています。iPhoneの設定から許可してください。');
-      return;
-    }
-
-    // 実際にポップアップを出す
-    Notification.requestPermission().then((permission) => {
-      if (permission === 'granted') {
-        alert('ありがとうございます！通知が許可されました。3秒後にテスト通知が届きます。');
-        
-        // テスト通知を飛ばす
-        navigator.serviceWorker.ready.then((registration) => {
-          setTimeout(() => {
-            registration.showNotification('通知テスト', {
-              body: 'カレンダーアプリからの通知テストです！成功しました。',
-              icon: './icon.png'
-            });
-          }, 3000);
-        });
-      } else {
-        alert('通知が拒否されました。');
-      }
-    });
-  });
-</script>
 
 <style>
 body{font-family:sans-serif;margin:0;background:#f5f5f5;}
@@ -961,9 +917,6 @@ input:focus, textarea:focus {
   </div>
 </div>
 
-<!-- トースト -->
-<div id="toast" class="toast"></div>
-
 <script>
 let current=new Date();
 let pickerYear=current.getFullYear();
@@ -1513,16 +1466,13 @@ function togglePinStamp(stampChar) {
   if (!target.pinned) {
     const textPinnedCount = quickStamps.filter(item => item.pinned).length;
     if (textPinnedCount >= 5) {
-      showToast("ピン留めは最大5個までです");
       return;
     }
     target.pinned = true;
     if (navigator.vibrate) navigator.vibrate([30, 20]);
-    showToast(`パレットの左側に固定しました 📌`);
   } else {
     target.pinned = false;
     if (navigator.vibrate) navigator.vibrate(20);
-    showToast("ピン留めを解除しました");
   }
   
   save();
@@ -1815,15 +1765,6 @@ let lastTap = 0;
 function clearCopiedState() {
   copiedEventData = null;
   render();
-}
-
-function showToast(message) {
-  const toast = document.getElementById("toast");
-  toast.innerText = message;
-  toast.classList.add("show");
-  setTimeout(() => {
-    toast.classList.remove("show");
-  }, 2000);
 }
 
 function createDayCell(dateObj,isOtherMonth=false){
